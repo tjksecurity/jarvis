@@ -37,6 +37,7 @@ class Agent:
     config: Config
     memory: MemoryStore
     confirm_destructive: Callable[[str, str], bool]
+    exclude_tool_tags: tuple[str, ...] = ()
     client: anthropic.Anthropic = field(init=False)
     messages: list[dict] = field(default_factory=list)
     system_prompt: str = field(default="", init=False)
@@ -52,8 +53,8 @@ class Agent:
             workstation=workstation,
             memory_summary=self.memory.summary(),
         )
-        # Cached tool list = custom tools + Anthropic server-side tools
-        custom = tool_pkg.schemas_for_api()
+        # Cached tool list = custom tools (filtered) + Anthropic server-side tools
+        custom = tool_pkg.schemas_for_api(exclude_tags=self.exclude_tool_tags)
         self._tool_schemas = custom + SERVER_TOOLS
         self._ctx = ToolContext(
             config=self.config,

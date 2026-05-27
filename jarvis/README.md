@@ -27,9 +27,15 @@ remembers you, and speaks to you in EVA's voice when you want her to.
   `Awesome-OSINT-For-Everything` corpus on this workstation for the right tool
 - Text-to-speech via macOS `say` using the "Ava" voice (Red Alert cadence at 210 wpm)
 
-Voice in: not in v1. Wire up Whisper later — install with
+Voice in: not in v1 for the CLI. On the phone, voice in is built-in via the
+Web Speech API. Wire up Whisper for the CLI later — install with
 `pip install '.[voice-stt]'` and the optional STT path is ready for an
 implementation.
+
+**EVA on your phone:** `jarvis-serve` starts an HTTPS-ready FastAPI server
+that drives the same agent, plus a PWA frontend with voice in/out. Pair your
+iPhone via Cloudflare Tunnel and EVA is reachable anywhere. See
+[MOBILE.md](MOBILE.md) for the full deployment walkthrough.
 
 ---
 

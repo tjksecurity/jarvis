@@ -30,8 +30,15 @@ def dispatch(name: str, tool_input: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(content=f"Tool '{name}' raised: {type(exc).__name__}: {exc}", is_error=True)
 
 
-def schemas_for_api() -> list[dict]:
-    return [t.to_api_schema() for t in ALL_TOOLS]
+def schemas_for_api(exclude_tags: tuple[str, ...] = ()) -> list[dict]:
+    """Return tool schemas, optionally filtering out tools that carry any of the given tags."""
+    if not exclude_tags:
+        return [t.to_api_schema() for t in ALL_TOOLS]
+    return [
+        t.to_api_schema()
+        for t in ALL_TOOLS
+        if not any(tag in t.tags for tag in exclude_tags)
+    ]
 
 
 __all__ = [
