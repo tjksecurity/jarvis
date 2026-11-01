@@ -147,15 +147,15 @@ Web Speech API works on iOS Safari 14.5+ but has quirks:
 
 ## 5. Destructive operations — the lock
 
-By default the phone EVA can read everything but can't `rm`, `write_file`,
-`sudo`, or anything else marked destructive. The lock icon in the top right
-cycles:
+Every `shell_exec` command and `write_file` operation checks the server's operator
+authorization gate. This includes informational shell commands; the legacy
+`confirm` input cannot bypass the check. The lock icon in the top right cycles:
 
 | Icon | Mode | Effect |
 | --- | --- | --- |
-| 🔒 | `deny` (default) | All destructive ops fail. EVA reports "requires operator authorization." |
-| 🔑 | `one_shot` | Next destructive op succeeds, then re-locks. |
-| 🔓 | `session` | All destructive ops allowed for 10 minutes, then re-locks. |
+| 🔒 | `deny` (default) | Shell and file write operations fail until authorized. |
+| 🔑 | `one_shot` | Next shell or file write operation succeeds, then re-locks. |
+| 🔓 | `session` | Shell and file write operations allowed for 10 minutes, then re-locks. |
 
 You set it from the phone — EVA cannot self-authorize. Tap once for one-shot,
 again for a session, again to lock.

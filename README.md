@@ -20,7 +20,7 @@ remembers you, and speaks to you in EVA's voice when you want her to.
 - Search the live web and fetch URLs (Anthropic's server-side `web_search` / `web_fetch`)
 - Execute Python in a sandboxed code-execution container for math, parsing, charts
 - Read and search files on your machine
-- Write files and run shell commands — with an authorization prompt for anything destructive
+- Write files and run shell commands — with operator authorization for every file write and shell command
 - Report system telemetry (time, OS, hostname, network, disk, **macOS battery**)
 - Persistent memory across sessions — EVA remembers your name, projects, preferences
 - OSINT triage — given a target or technique, EVA searches the curated
@@ -108,17 +108,21 @@ Ctrl-C interrupts EVA mid-response (the next line cancels her current utterance 
 
 ## Safety
 
-EVA gates anything destructive behind an operator confirmation prompt:
+EVA gates file writes and arbitrary shell execution behind operator authorization:
 
 - `write_file` always asks before writing to disk
-- `shell_exec` asks before running commands containing `rm`, `mv`, `dd`, `sudo`, `git push`,
-  redirection (`>` / `>>`), package installs, etc. — and you can force the prompt
-  with `confirm=true` in the tool call
+- `shell_exec` requires operator authorization for every command, including `git status`
+  and other informational commands. The legacy `confirm` input cannot bypass this check.
 
 Confirmations are interactive — EVA cannot self-approve.
 
-Read-only operations (reading files, listing directories, `git status`, `ps`, web
+Read-only operations (reading files, listing directories, web
 search, code execution in the sandbox, memory recall) run without prompting.
+
+The server uses its existing deny / one-shot / session authorization gate for every
+shell command. Its `--read-only` option excludes shell and destructive tools from
+both the advertised schemas and local execution. Local execution rejects unknown
+tools and tools outside the agent's advertised custom tool set.
 
 ---
 
@@ -149,7 +153,7 @@ jarvis/
 ├── config.py       # env / .env loader
 └── tools/          # client-side tool surface
     ├── files.py    # read_file, write_file, list_dir, search_files
-    ├── shell.py    # shell_exec with destructive-action gating
+    ├── shell.py    # shell_exec with authorization for every command
     ├── memory.py   # remember, recall, forget
     ├── system.py   # get_time, system_info, disk_usage, network_info
     ├── osint.py    # osint_search, osint_sections (uses repo's README)

@@ -1,26 +1,11 @@
-"""Local shell command execution. Gated by operator confirmation for destructive ops."""
+"""Local shell command execution. Every command requires operator authorization."""
 from __future__ import annotations
 
-import shlex
 import subprocess
 
 from .base import Tool, ToolContext, ToolResult
 
-# Heuristic: commands containing any of these tokens require explicit confirmation.
-DESTRUCTIVE_TOKENS = (
-    "rm ", "rmdir", "mv ", "dd ", "mkfs", "shutdown", "reboot", "killall",
-    " sudo", "sudo ", "chmod -R", "chown -R", ">", ">>", "git push", "git reset --hard",
-    "git clean", "npm publish", "pip install", "brew install", "brew uninstall",
-    "curl -X POST", "curl -X DELETE", "curl -X PUT", "wget ",
-    "format ", "diskutil erase",
-)
-
 MAX_OUTPUT = 100_000
-
-
-def _looks_destructive(cmd: str) -> bool:
-    lower = cmd.lower()
-    return any(tok in lower for tok in DESTRUCTIVE_TOKENS)
 
 
 def _shell_exec(tool_input: dict, ctx: ToolContext) -> ToolResult:
@@ -28,7 +13,6 @@ def _shell_exec(tool_input: dict, ctx: ToolContext) -> ToolResult:
     if not command:
         return ToolResult("command is required", is_error=True)
     timeout = int(tool_input.get("timeout", 60))
-    force_confirm = bool(tool_input.get("confirm", False))
     cwd = tool_input.get("cwd")
     workdir = ctx.workspace
     if cwd:
@@ -38,10 +22,15 @@ def _shell_exec(tool_input: dict, ctx: ToolContext) -> ToolResult:
             p = ctx.workspace / p
         workdir = p.resolve()
 
-    if force_confirm or _looks_destructive(command):
-        detail = f"$ {command}\ncwd={workdir}\ntimeout={timeout}s"
-        if not ctx.confirm_destructive("shell_exec", detail):
-            return ToolResult("[FAIL] operator declined shell_exec.", is_error=True)
+    # Arbitrary shell syntax cannot be classified safely by a token blacklist.
+    # Approval comes only from the operator callback, never from model input.
+    detail = f"$ {command}\ncwd={workdir}\ntimeout={timeout}s"
+    try:
+        approved = ctx.confirm_destructive("shell_exec", detail)
+    except (Exception, KeyboardInterrupt):
+        return ToolResult("[FAIL] operator authorization unavailable for shell_exec.", is_error=True)
+    if approved is not True:
+        return ToolResult("[FAIL] operator declined shell_exec.", is_error=True)
 
     try:
         proc = subprocess.run(
@@ -79,9 +68,9 @@ TOOLS: list[Tool] = [
         name="shell_exec",
         description=(
             "Execute a shell command on the operator's local machine. "
-            "Read-only / informational commands (ls, cat, git status, ps, ifconfig, etc.) run immediately. "
-            "Commands that look destructive (rm, mv, sudo, redirection, git push, package installs, etc.) "
-            "trigger an operator confirmation prompt. Pass confirm=true to force the prompt even for safe-looking commands."
+            "Every command requires operator authorization, including informational commands. "
+            "The CLI prompts interactively; the server checks its authorization gate. "
+            "The confirm input is retained for compatibility and cannot bypass authorization."
         ),
         input_schema={
             "type": "object",
@@ -89,7 +78,7 @@ TOOLS: list[Tool] = [
                 "command": {"type": "string", "description": "Shell command to run (sh/bash semantics)."},
                 "cwd": {"type": "string", "description": "Optional working directory."},
                 "timeout": {"type": "integer", "default": 60, "description": "Seconds before the command is killed."},
-                "confirm": {"type": "boolean", "default": False, "description": "Force the confirmation prompt."},
+                "confirm": {"type": "boolean", "default": False, "description": "Legacy input; every command requires operator authorization regardless of this value."},
             },
             "required": ["command"],
         },

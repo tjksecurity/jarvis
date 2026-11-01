@@ -20,10 +20,19 @@ ALL_TOOLS: list[Tool] = [
 TOOL_BY_NAME: dict[str, Tool] = {t.name: t for t in ALL_TOOLS}
 
 
-def dispatch(name: str, tool_input: dict, ctx: ToolContext) -> ToolResult:
+def dispatch(
+    name: str,
+    tool_input: dict,
+    ctx: ToolContext,
+    *,
+    allowed_tool_names: frozenset[str],
+) -> ToolResult:
+    """Execute only a known tool explicitly allowed by the calling agent."""
     tool = TOOL_BY_NAME.get(name)
     if tool is None:
         return ToolResult(content=f"Unknown tool: {name}", is_error=True)
+    if name not in allowed_tool_names:
+        return ToolResult(content=f"Tool '{name}' is not allowed for this agent.", is_error=True)
     try:
         return tool.run(tool_input, ctx)
     except Exception as exc:  # noqa: BLE001 — report any failure to the model

@@ -42,6 +42,7 @@ class Agent:
     messages: list[dict] = field(default_factory=list)
     system_prompt: str = field(default="", init=False)
     _tool_schemas: list[dict] = field(default_factory=list, init=False)
+    _allowed_tool_names: frozenset[str] = field(default_factory=frozenset, init=False)
     _ctx: ToolContext = field(init=False)
 
     def __post_init__(self) -> None:
@@ -55,6 +56,9 @@ class Agent:
         )
         # Cached tool list = custom tools (filtered) + Anthropic server-side tools
         custom = tool_pkg.schemas_for_api(exclude_tags=self.exclude_tool_tags)
+        # Bind execution to the same custom tools advertised to this agent.
+        # Provider-side tools must never be dispatched through the local registry.
+        self._allowed_tool_names = frozenset(tool["name"] for tool in custom)
         self._tool_schemas = custom + SERVER_TOOLS
         self._ctx = ToolContext(
             config=self.config,
@@ -195,7 +199,9 @@ class Agent:
                 continue
             name = block.name
             tool_input = block.input or {}
-            res = tool_pkg.dispatch(name, tool_input, self._ctx)
+            res = tool_pkg.dispatch(
+                name, tool_input, self._ctx, allowed_tool_names=self._allowed_tool_names
+            )
             results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
